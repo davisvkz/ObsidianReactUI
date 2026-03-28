@@ -1,0 +1,10 @@
+{
+  "enabledCssSnippets": [
+    "MCL Wide Views"
+  ],
+  "cssTheme": "",
+  "showRibbon": false,
+  "nativeMenus": false,
+  "showViewHeader": false,
+  "theme": "system"
+}
