@@ -27,7 +27,7 @@ function launchObsidianWithRemoteDebugging() {
 		"bash",
 		[
 			"-lc",
-			`nohup obsidian --remote-debugging-port=${OBSIDIAN_REMOTE_DEBUGGING_PORT} "obsidian://open?path=$(pwd)" >/dev/null 2>&1 &`,
+			`nohup obsidian --remote-debugging-port=${OBSIDIAN_REMOTE_DEBUGGING_PORT} "obsidian://open?path=$(cd .. && pwd)" >/dev/null 2>&1 &`,
 		],
 		{
 			cwd: process.cwd(),
