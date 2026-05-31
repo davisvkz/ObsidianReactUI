@@ -1,17 +1,20 @@
 import { useCallback, useContext, useRef, useSyncExternalStore } from "react";
 import {
+	type FolderNode,
 	type MdItem,
 	type MdSnapshot,
+	getChildFolders,
 	getFolderSnapshot,
 	getSnapshot,
 	subscribe,
+	subscribeChildFolders,
 	subscribeFolder,
 	updateFrontmatter,
 } from "@/scripts/markdownStore";
 import { AppContext } from "@/scripts/utils";
 import type { App } from "obsidian";
 
-function useApp(): App {
+export function useApp(): App {
 	const app = useContext(AppContext);
 	if (!app) throw new Error("hook precisa de um <AppContext.Provider>.");
 	return app;
@@ -57,6 +60,24 @@ export function useMarkdownFolder(folder: string): UseMarkdownFolder {
 		[app, folder],
 	);
 	const items = useSyncExternalStore(sub, () => getFolderSnapshot(app, folder));
+
+	return { items, hostRef };
+}
+
+export interface UseChildFolders {
+	items: FolderNode[];
+	hostRef: React.RefObject<HTMLSpanElement | null>;
+}
+
+export function useChildFolders(folder: string): UseChildFolders {
+	const app = useApp();
+	const hostRef = useRef<HTMLSpanElement>(null);
+
+	const sub = useCallback(
+		(cb: () => void) => subscribeChildFolders(app, folder, cb, hostRef.current),
+		[app, folder],
+	);
+	const items = useSyncExternalStore(sub, () => getChildFolders(app, folder));
 
 	return { items, hostRef };
 }

@@ -1,4 +1,11 @@
-import type { App, CachedMetadata, EventRef, TFile } from "obsidian";
+import type {
+	App,
+	CachedMetadata,
+	EventRef,
+	TAbstractFile,
+	TFile,
+	TFolder,
+} from "obsidian";
 
 /** Debounce local (evita import de runtime do módulo `obsidian`, indisponível no eval). */
 function debounce(cb: () => void, timeout: number): () => void {
@@ -28,6 +35,12 @@ export interface MdItem {
 	frontmatter: Record<string, unknown>;
 }
 
+/** Subpasta de uma pasta (um nó filho na árvore de to-dos). */
+export interface FolderNode {
+	folder: string;
+	name: string;
+}
+
 interface Subscriber {
 	cb: () => void;
 	host: Node | null;
@@ -44,13 +57,21 @@ interface FolderEntry {
 	subscribers: Set<Subscriber>;
 }
 
+interface ChildEntry {
+	folder: string;
+	snapshot: FolderNode[];
+	subscribers: Set<Subscriber>;
+}
+
 interface Store {
 	app: App;
 	refs: EventRef[];
 	files: Map<string, FileEntry>;
 	folders: Map<string, FolderEntry>;
+	childFolders: Map<string, ChildEntry>;
 	dirtyFiles: Set<string>;
 	dirtyFolders: Set<string>;
+	dirtyChildFolders: Set<string>;
 	flush: () => void;
 }
 
@@ -103,6 +124,20 @@ function buildFolderSnapshot(app: App, folder: string): MdItem[] {
 		}));
 }
 
+/** Type guard sem `instanceof` (módulo `obsidian` não é bundlável no eval). */
+function isFolder(f: TAbstractFile): f is TFolder {
+	return (f as TFolder).children !== undefined;
+}
+
+function buildChildFolders(app: App, folder: string): FolderNode[] {
+	const dir = app.vault.getFolderByPath(folder);
+	if (!dir) return [];
+	return dir.children
+		.filter(isFolder)
+		.sort((a, b) => a.name.localeCompare(b.name))
+		.map((c) => ({ folder: c.path, name: c.name }));
+}
+
 /**
  * Devolve o store singleton vivo em `window`. Sobrevive aos `eval(bundle.js)` que
  * o Dataview faz a cada render — por isso os listeners globais são registrados UMA vez.
@@ -117,8 +152,10 @@ function getStore(app: App): Store {
 		refs: [],
 		files: new Map(),
 		folders: new Map(),
+		childFolders: new Map(),
 		dirtyFiles: new Set(),
 		dirtyFolders: new Set(),
+		dirtyChildFolders: new Set(),
 		flush: undefined as unknown as () => void,
 	};
 
@@ -141,19 +178,36 @@ function getStore(app: App): Store {
 				notify(entry.subscribers);
 			}
 		}
+		for (const folder of store.dirtyChildFolders) {
+			const entry = store.childFolders.get(folder);
+			if (entry) {
+				entry.snapshot = buildChildFolders(app, folder);
+				notify(entry.subscribers);
+			}
+		}
 		store.dirtyFiles.clear();
 		store.dirtyFolders.clear();
+		store.dirtyChildFolders.clear();
 	}, 24);
 
-	const touchFolder = (folder: string) => {
+	// Listagem de `.md` (useMarkdownFolder) — muda com create/delete/rename de arquivos.
+	const markFiles = (folder: string) => {
 		if (store.folders.has(folder)) {
 			store.dirtyFolders.add(folder);
+			store.flush();
+		}
+	};
+	// Listagem de subpastas (useChildFolders) — muda com create/delete/rename de pastas.
+	const markChildren = (folder: string) => {
+		if (store.childFolders.has(folder)) {
+			store.dirtyChildFolders.add(folder);
 			store.flush();
 		}
 	};
 
 	// Listeners GLOBAIS únicos para o vault inteiro.
 	store.refs.push(
+		// Editar `index.md` (toggle de `done`) NÃO altera subpastas → só markFiles.
 		app.metadataCache.on("changed", (file, data, cache) => {
 			const entry = store.files.get(file.path);
 			if (entry) {
@@ -161,13 +215,23 @@ function getStore(app: App): Store {
 				store.dirtyFiles.add(file.path);
 				store.flush();
 			}
-			touchFolder(file.parent?.path ?? "/");
+			markFiles(file.parent?.path ?? "/");
 		}),
-		app.vault.on("create", (file) => touchFolder(file.parent?.path ?? "/")),
-		app.vault.on("delete", (file) => touchFolder(file.parent?.path ?? "/")),
+		app.vault.on("create", (file) => {
+			markFiles(file.parent?.path ?? "/");
+			markChildren(file.parent?.path ?? "/");
+		}),
+		app.vault.on("delete", (file) => {
+			markFiles(file.parent?.path ?? "/");
+			markChildren(file.parent?.path ?? "/");
+		}),
 		app.vault.on("rename", (file, oldPath) => {
-			touchFolder(file.parent?.path ?? "/");
-			touchFolder(parentOf(oldPath));
+			const newParent = file.parent?.path ?? "/";
+			const oldParent = parentOf(oldPath);
+			markFiles(newParent);
+			markChildren(newParent);
+			markFiles(oldParent);
+			markChildren(oldParent);
 		}),
 	);
 
@@ -201,6 +265,19 @@ function ensureFolderEntry(store: Store, folder: string): FolderEntry {
 			subscribers: new Set(),
 		};
 		store.folders.set(folder, entry);
+	}
+	return entry;
+}
+
+function ensureChildEntry(store: Store, folder: string): ChildEntry {
+	let entry = store.childFolders.get(folder);
+	if (!entry) {
+		entry = {
+			folder,
+			snapshot: buildChildFolders(store.app, folder),
+			subscribers: new Set(),
+		};
+		store.childFolders.set(folder, entry);
 	}
 	return entry;
 }
@@ -239,6 +316,23 @@ export function subscribeFolder(
 	};
 }
 
+/** Inscreve `cb` nas mudanças das subpastas de `folder` (criação/remoção/rename de pastas). */
+export function subscribeChildFolders(
+	app: App,
+	folder: string,
+	cb: () => void,
+	host: Node | null,
+): () => void {
+	const store = getStore(app);
+	const entry = ensureChildEntry(store, folder);
+	const sub: Subscriber = { cb, host };
+	entry.subscribers.add(sub);
+	return () => {
+		entry.subscribers.delete(sub);
+		if (entry.subscribers.size === 0) store.childFolders.delete(folder);
+	};
+}
+
 /** Snapshot referencialmente estável de um arquivo. */
 export function getSnapshot(app: App, path: string): MdSnapshot {
 	return ensureFileEntry(getStore(app), path).snapshot;
@@ -247,6 +341,11 @@ export function getSnapshot(app: App, path: string): MdSnapshot {
 /** Snapshot referencialmente estável da listagem de uma pasta. */
 export function getFolderSnapshot(app: App, folder: string): MdItem[] {
 	return ensureFolderEntry(getStore(app), folder).snapshot;
+}
+
+/** Snapshot referencialmente estável das subpastas de uma pasta. */
+export function getChildFolders(app: App, folder: string): FolderNode[] {
+	return ensureChildEntry(getStore(app), folder).snapshot;
 }
 
 /**
@@ -293,4 +392,31 @@ export async function createMarkdown(
 export async function deleteFile(app: App, path: string): Promise<void> {
 	const file = app.vault.getAbstractFileByPath(path) as TFile | null;
 	if (file) await app.fileManager.trashFile(file);
+}
+
+/**
+ * Cria um to-do no modelo pasta-por-to-do: uma subpasta de `parent` com `index.md`
+ * contendo `done: false`. Evita colisão de nome. Devolve o path da pasta criada.
+ */
+export async function createTodoFolder(
+	app: App,
+	parent: string,
+	name: string,
+): Promise<string> {
+	await ensureFolder(app, parent);
+	const safe = name.trim().replace(/[\\/:*?"<>|]/g, "-") || "untitled";
+	let folder = `${parent}/${safe}`;
+	let n = 1;
+	while (app.vault.getAbstractFileByPath(folder)) {
+		folder = `${parent}/${safe} ${++n}`;
+	}
+	await app.vault.createFolder(folder);
+	await app.vault.create(`${folder}/index.md`, "---\ndone: false\n---\n");
+	return folder;
+}
+
+/** Move uma pasta inteira para a lixeira (exclusão em cascata: index.md + subárvore). */
+export async function deleteFolder(app: App, folder: string): Promise<void> {
+	const dir = app.vault.getFolderByPath(folder);
+	if (dir) await app.fileManager.trashFile(dir);
 }
