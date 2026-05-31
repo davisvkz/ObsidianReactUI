@@ -9,13 +9,24 @@ const BUNDLE_PATH = path.resolve(__dirname, "../../dist/bundle.js");
 const VAULT_BUNDLE_PATH = ".js/dist/bundle.js";
 const ROOT = "todos";
 
-/** Lê os checkboxes renderizados pelo TodoApp: `{ label, checked }` por nó. */
+/** Lê os checkboxes renderizados pelo TodoApp: `{ label, checked }` por nó.
+ *  O TodoApp renderiza dentro de um Shadow DOM, então perfuramos os shadow roots. */
 function readTodos() {
 	return browser.executeObsidian(() => {
-		const inputs = Array.from(
-			document.querySelectorAll<HTMLInputElement>("input.mantine-Checkbox-input"),
-		);
-		return inputs.map((inp) => {
+		const deepQueryAll = (selector: string): Element[] => {
+			const out: Element[] = [];
+			const walk = (node: Document | ShadowRoot) => {
+				out.push(...Array.from(node.querySelectorAll(selector)));
+				for (const el of Array.from(node.querySelectorAll("*"))) {
+					if ((el as HTMLElement).shadowRoot)
+						walk((el as HTMLElement).shadowRoot as ShadowRoot);
+				}
+			};
+			walk(document);
+			return out;
+		};
+		return deepQueryAll("input.mantine-Checkbox-input").map((el) => {
+			const inp = el as HTMLInputElement;
 			const root = inp.closest(".mantine-Checkbox-root");
 			const label =
 				root?.querySelector(".mantine-Checkbox-label")?.textContent ?? "";
@@ -94,10 +105,26 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 			}
 		}, "index.md");
 
-		// Espera o TodoApp montar (input de adicionar presente).
-		await browser
-			.$('input[placeholder="Novo to-do..."]')
-			.waitForExist({ timeout: 15_000 });
+		// Espera o TodoApp montar (input de adicionar presente, dentro do shadow).
+		await browser.waitUntil(
+			async () =>
+				browser.executeObsidian(() => {
+					const walk = (node: Document | ShadowRoot): boolean => {
+						for (const inp of Array.from(
+							node.querySelectorAll<HTMLInputElement>("input"),
+						)) {
+							if (inp.placeholder.startsWith("Novo to-do")) return true;
+						}
+						for (const el of Array.from(node.querySelectorAll("*"))) {
+							const sr = (el as HTMLElement).shadowRoot;
+							if (sr && walk(sr)) return true;
+						}
+						return false;
+					};
+					return walk(document);
+				}),
+			{ timeout: 15_000, timeoutMsg: "TodoApp não montou" },
+		);
 	});
 
 	after(async function () {
@@ -151,9 +178,15 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 	it("clicar no checkbox escreve `done` no arquivo (round-trip)", async function () {
 		// Clica no checkbox de "Leite" (estava desmarcado) e confirma a escrita.
 		await browser.executeObsidian(() => {
-			const roots = Array.from(
-				document.querySelectorAll(".mantine-Checkbox-root"),
-			);
+			const roots: Element[] = [];
+			const walk = (node: Document | ShadowRoot) => {
+				roots.push(...Array.from(node.querySelectorAll(".mantine-Checkbox-root")));
+				for (const el of Array.from(node.querySelectorAll("*"))) {
+					const sr = (el as HTMLElement).shadowRoot;
+					if (sr) walk(sr);
+				}
+			};
+			walk(document);
 			for (const root of roots) {
 				const label = root.querySelector(".mantine-Checkbox-label")?.textContent;
 				if (label === "Leite") {

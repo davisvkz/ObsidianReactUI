@@ -134,6 +134,11 @@ function buildChildFolders(app: App, folder: string): FolderNode[] {
 	if (!dir) return [];
 	return dir.children
 		.filter(isFolder)
+		// Um to-do É a sua pasta + `index.md`. Subpasta sem `index.md` não é um to-do
+		// (assim deletar a nota faz o nó sumir, em vez de virar fantasma).
+		.filter(
+			(c) => app.vault.getAbstractFileByPath(`${c.path}/index.md`) != null,
+		)
 		.sort((a, b) => a.name.localeCompare(b.name))
 		.map((c) => ({ folder: c.path, name: c.name }));
 }
@@ -205,6 +210,17 @@ function getStore(app: App): Store {
 		}
 	};
 
+	// Criar/remover um `index.md` muda se a pasta que o contém É um to-do, então a
+	// listagem do AVÔ (pasta-pai dessa pasta) precisa ser reconstruída.
+	const isIndex = (p: string) => p.split("/").pop() === "index.md";
+	const onStructuralChange = (filePath: string) => {
+		// `parentOf(filePath)` é robusto a `file.parent` já destacado em deletes.
+		const parent = parentOf(filePath);
+		markFiles(parent);
+		markChildren(parent);
+		if (isIndex(filePath)) markChildren(parentOf(parent));
+	};
+
 	// Listeners GLOBAIS únicos para o vault inteiro.
 	store.refs.push(
 		// Editar `index.md` (toggle de `done`) NÃO altera subpastas → só markFiles.
@@ -215,23 +231,13 @@ function getStore(app: App): Store {
 				store.dirtyFiles.add(file.path);
 				store.flush();
 			}
-			markFiles(file.parent?.path ?? "/");
+			markFiles(parentOf(file.path));
 		}),
-		app.vault.on("create", (file) => {
-			markFiles(file.parent?.path ?? "/");
-			markChildren(file.parent?.path ?? "/");
-		}),
-		app.vault.on("delete", (file) => {
-			markFiles(file.parent?.path ?? "/");
-			markChildren(file.parent?.path ?? "/");
-		}),
+		app.vault.on("create", (file) => onStructuralChange(file.path)),
+		app.vault.on("delete", (file) => onStructuralChange(file.path)),
 		app.vault.on("rename", (file, oldPath) => {
-			const newParent = file.parent?.path ?? "/";
-			const oldParent = parentOf(oldPath);
-			markFiles(newParent);
-			markChildren(newParent);
-			markFiles(oldParent);
-			markChildren(oldParent);
+			onStructuralChange(file.path);
+			onStructuralChange(oldPath);
 		}),
 	);
 
