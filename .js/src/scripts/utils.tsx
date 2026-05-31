@@ -2,7 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import type { App } from "obsidian";
 import type { DataviewInlineApi } from "obsidian-dataview/lib/api/inline-api";
 import type React from "react";
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useEffect, useRef } from "react";
 import { type Root, createRoot } from "react-dom/client";
 
 /** O `App` do Obsidian, disponibilizado a toda a árvore React. */
@@ -64,24 +64,35 @@ export function mantineRender(
 		}
 	}
 
-	const root = createRoot(dv.container);
-	w.__mdRoot__ = root;
+	// Shadow DOM: isola o CSS (Tailwind/Mantine) do resto do Obsidian E injeta o
+	// `__STYLE__` embutido — sem isso os componentes Mantine ficam sem estilo
+	// (ex.: o ícone do checkbox renderiza em tamanho gigante).
+	dv.container.innerHTML = "";
+	const host = document.createElement("div");
+	dv.container.appendChild(host);
+	const shadow = host.attachShadow({ mode: "open" });
 
-	function Mantinewrapper(props: { children: React.ReactNode }) {
-		const root = useContext(ShadowPortalContext);
-		return (
-			<MantineProvider
-				defaultColorScheme="dark"
-				getRootElement={() => root}
-				theme={{ components: { Portal: { defaultProps: { target: root } } } }}
-			>
-				{props.children}
-			</MantineProvider>
-		);
-	}
+	const style = document.createElement("style");
+	style.textContent = __STYLE__;
+	shadow.appendChild(style);
+
+	// `mount` é o `:host>div` para onde os seletores transformados apontam
+	// (variáveis Mantine + atributo de color-scheme).
+	const mount = document.createElement("div");
+	shadow.appendChild(mount);
+
+	const root = createRoot(mount);
+	w.__mdRoot__ = root;
 	root.render(
 		<AppContext.Provider value={app}>
-			<Mantinewrapper>{children}</Mantinewrapper>
+			<MantineProvider
+				defaultColorScheme="dark"
+				cssVariablesSelector=":host > div"
+				getRootElement={() => mount}
+				theme={{ components: { Portal: { defaultProps: { target: mount } } } }}
+			>
+				{children}
+			</MantineProvider>
 		</AppContext.Provider>,
 	);
 	return dv.container;
