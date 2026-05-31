@@ -1,7 +1,7 @@
 node_modules/
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/playwright/.auth/
 /dist
+
+# wdio-obsidian-service
+.obsidian-cache/
+wdio-logs*/
+test/.fhs-result
