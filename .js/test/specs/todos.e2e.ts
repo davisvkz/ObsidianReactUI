@@ -65,6 +65,20 @@ function makeTodoFolder(folderPath: string, done: boolean) {
 	);
 }
 
+/** Cria uma pasta "pelada" (sem `index.md`) — não é um to-do, só uma subpasta. */
+function makeBareFolder(folderPath: string) {
+	return browser.executeObsidian(async ({ app }, fp) => {
+		const parts = fp.split("/");
+		let acc = "";
+		for (const part of parts) {
+			acc = acc ? `${acc}/${part}` : part;
+			if (!app.vault.getAbstractFileByPath(acc)) {
+				await app.vault.createFolder(acc);
+			}
+		}
+	}, folderPath);
+}
+
 function removeRoot() {
 	return browser.executeObsidian(async ({ app }, root) => {
 		if (await app.vault.adapter.exists(root)) {
@@ -131,6 +145,21 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 		await removeRoot();
 	});
 
+	it("ignora subpasta sem index.md (não vira nó-fantasma)", async function () {
+		// O core lista TODAS as subpastas; é o TodoNode que se auto-oculta quando o
+		// próprio index.md não existe. Uma pasta "pelada" não deve aparecer como to-do.
+		await makeTodoFolder(`${ROOT}/SeamReal`, false);
+		await makeBareFolder(`${ROOT}/SeamGhost`);
+
+		await waitForTodos(
+			(t) => t.some((x) => x.label === "SeamReal"),
+			'esperava o to-do "SeamReal" (com index.md) aparecer',
+		);
+		// "SeamGhost" (sem index.md) jamais deve renderizar um checkbox.
+		const todos = await readTodos();
+		expect(todos.some((x) => x.label === "SeamGhost")).toBe(false);
+	});
+
 	it("lista um to-do de topo criado no vault", async function () {
 		await makeTodoFolder(`${ROOT}/Comprar`, false);
 		await waitForTodos(
@@ -145,7 +174,7 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 		await makeTodoFolder(`${ROOT}/Comprar/Leite/Fermento`, false);
 
 		// O topo só lista filhos de `todos`; "Leite" e "Fermento" só aparecem
-		// se a recursão (useChildFolders por nível) estiver funcionando.
+		// se a recursão (useSubfolders por nível) estiver funcionando.
 		await waitForTodos(
 			(t) => {
 				const labels = t.map((x) => x.label);

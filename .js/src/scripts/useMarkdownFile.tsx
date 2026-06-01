@@ -1,15 +1,12 @@
 import type { App } from "obsidian";
 import { useCallback, useContext, useRef, useSyncExternalStore } from "react";
 import {
-	type FolderNode,
-	type MdItem,
 	type MdSnapshot,
-	getChildFolders,
-	getFolderSnapshot,
+	type Subfolder,
 	getSnapshot,
+	getSubfolders,
 	subscribe,
-	subscribeChildFolders,
-	subscribeFolder,
+	subscribeSubfolders,
 	updateFrontmatter,
 } from "@/scripts/markdownStore";
 import { AppContext } from "@/scripts/utils";
@@ -57,6 +54,7 @@ export interface UseMarkdownFile extends MdSnapshot {
 	update: (fn: (frontmatter: Record<string, unknown>) => void) => Promise<void>;
 }
 
+/** Lê (reativamente) o frontmatter + corpo de um `.md` e expõe escrita em lote. */
 export function useMarkdownFile(path: string): UseMarkdownFile {
 	const { app, value, hostRef } = useStoreValue(subscribe, getSnapshot, path);
 	return {
@@ -66,29 +64,16 @@ export function useMarkdownFile(path: string): UseMarkdownFile {
 	};
 }
 
-export interface UseMarkdownFolder {
-	items: MdItem[];
+export interface UseSubfolders {
+	items: Subfolder[];
 	hostRef: React.RefObject<HTMLSpanElement | null>;
 }
 
-export function useMarkdownFolder(folder: string): UseMarkdownFolder {
+/** Lista (reativamente) as subpastas de uma pasta. */
+export function useSubfolders(folder: string): UseSubfolders {
 	const { value, hostRef } = useStoreValue(
-		subscribeFolder,
-		getFolderSnapshot,
-		folder,
-	);
-	return { items: value, hostRef };
-}
-
-export interface UseChildFolders {
-	items: FolderNode[];
-	hostRef: React.RefObject<HTMLSpanElement | null>;
-}
-
-export function useChildFolders(folder: string): UseChildFolders {
-	const { value, hostRef } = useStoreValue(
-		subscribeChildFolders,
-		getChildFolders,
+		subscribeSubfolders,
+		getSubfolders,
 		folder,
 	);
 	return { items: value, hostRef };
