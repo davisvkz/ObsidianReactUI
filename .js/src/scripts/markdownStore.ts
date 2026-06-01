@@ -41,41 +41,9 @@ export interface FolderNode {
 	name: string;
 }
 
-interface Subscriber {
-	cb: () => void;
-	host: Node | null;
-}
-
-interface FileEntry {
-	snapshot: MdSnapshot;
-	subscribers: Set<Subscriber>;
-}
-
-interface FolderEntry {
-	folder: string;
-	snapshot: MdItem[];
-	subscribers: Set<Subscriber>;
-}
-
-interface ChildEntry {
-	folder: string;
-	snapshot: FolderNode[];
-	subscribers: Set<Subscriber>;
-}
-
-interface Store {
-	app: App;
-	refs: EventRef[];
-	files: Map<string, FileEntry>;
-	folders: Map<string, FolderEntry>;
-	childFolders: Map<string, ChildEntry>;
-	dirtyFiles: Set<string>;
-	dirtyFolders: Set<string>;
-	dirtyChildFolders: Set<string>;
-	flush: () => void;
-}
-
-const KEY = "__mdStore__";
+// ---------------------------------------------------------------------------
+// Construção de snapshots (funções puras: App + chave → dado imutável)
+// ---------------------------------------------------------------------------
 
 /** Pasta-pai de um path (`"todos/a.md"` → `"todos"`, raiz → `"/"`). */
 function parentOf(path: string): string {
@@ -136,12 +104,102 @@ function buildChildFolders(app: App, folder: string): FolderNode[] {
 		.filter(isFolder)
 		// Um to-do É a sua pasta + `index.md`. Subpasta sem `index.md` não é um to-do
 		// (assim deletar a nota faz o nó sumir, em vez de virar fantasma).
-		.filter(
-			(c) => app.vault.getAbstractFileByPath(`${c.path}/index.md`) != null,
-		)
+		.filter((c) => app.vault.getAbstractFileByPath(`${c.path}/index.md`) != null)
 		.sort((a, b) => a.name.localeCompare(b.name))
 		.map((c) => ({ folder: c.path, name: c.name }));
 }
+
+// ---------------------------------------------------------------------------
+// ReactiveCache: uma coleção reativa, chaveada por string, para useSyncExternalStore
+// ---------------------------------------------------------------------------
+
+interface Subscriber {
+	cb: () => void;
+	host: Node | null;
+}
+
+interface CacheEntry<T> {
+	snapshot: T;
+	subscribers: Set<Subscriber>;
+}
+
+/**
+ * Mantém, por chave, um snapshot referencialmente estável (só troca quando
+ * invalidado) e os assinantes daquela chave. Reconstrói via `build` apenas o que foi
+ * invalidado, coalescido pelo `requestFlush` compartilhado do store. Cada uma das
+ * coleções reativas (arquivos, listagens de `.md`, subpastas) é uma instância desta.
+ */
+class ReactiveCache<T> {
+	private readonly entries = new Map<string, CacheEntry<T>>();
+	private readonly dirty = new Set<string>();
+
+	constructor(
+		private readonly build: (key: string) => T,
+		private readonly requestFlush: () => void,
+	) {}
+
+	private ensure(key: string): CacheEntry<T> {
+		const existing = this.entries.get(key);
+		if (existing) return existing;
+		const created: CacheEntry<T> = {
+			snapshot: this.build(key),
+			subscribers: new Set(),
+		};
+		this.entries.set(key, created);
+		return created;
+	}
+
+	getSnapshot(key: string): T {
+		return this.ensure(key).snapshot;
+	}
+
+	subscribe(key: string, cb: () => void, host: Node | null): () => void {
+		const entry = this.ensure(key);
+		const subscriber: Subscriber = { cb, host };
+		entry.subscribers.add(subscriber);
+		return () => {
+			entry.subscribers.delete(subscriber);
+			if (entry.subscribers.size === 0) this.entries.delete(key);
+		};
+	}
+
+	/** Marca `key` para reconstrução no próximo flush (no-op se ninguém observa). */
+	invalidate(key: string): void {
+		if (!this.entries.has(key)) return;
+		this.dirty.add(key);
+		this.requestFlush();
+	}
+
+	flush(): void {
+		for (const key of this.dirty) {
+			const entry = this.entries.get(key);
+			if (!entry) continue;
+			entry.snapshot = this.build(key);
+			this.notify(entry.subscribers);
+		}
+		this.dirty.clear();
+	}
+
+	private notify(subscribers: Set<Subscriber>): void {
+		// Poda assinantes mortos (React removido sem desmontar → cleanup não rodou).
+		for (const s of subscribers)
+			if (s.host && !s.host.isConnected) subscribers.delete(s);
+		for (const s of subscribers) s.cb();
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Store singleton: as três caches + os listeners globais do vault
+// ---------------------------------------------------------------------------
+
+interface Store {
+	files: ReactiveCache<MdSnapshot>;
+	folders: ReactiveCache<MdItem[]>;
+	childFolders: ReactiveCache<FolderNode[]>;
+	refs: EventRef[];
+}
+
+const KEY = "__mdStore__";
 
 /**
  * Devolve o store singleton vivo em `window`. Sobrevive aos `eval(bundle.js)` que
@@ -152,63 +210,32 @@ function getStore(app: App): Store {
 	const existing = w[KEY];
 	if (existing) return existing;
 
-	const store: Store = {
-		app,
-		refs: [],
-		files: new Map(),
-		folders: new Map(),
-		childFolders: new Map(),
-		dirtyFiles: new Set(),
-		dirtyFolders: new Set(),
-		dirtyChildFolders: new Set(),
-		flush: undefined as unknown as () => void,
-	};
+	// Último conteúdo cru visto por arquivo, para reconstruir o corpo no snapshot.
+	const lastData = new Map<string, string>();
 
-	const notify = (subs: Set<Subscriber>) => {
-		// Poda assinantes mortos (React removido sem desmontar → cleanup não rodou).
-		for (const s of subs) if (s.host && !s.host.isConnected) subs.delete(s);
-		for (const s of subs) s.cb();
-	};
+	let flush: () => void = () => {};
+	const requestFlush = () => flush();
 
-	// Coalescência: uma rajada de eventos vira UMA notificação por entrada.
-	store.flush = debounce(() => {
-		for (const path of store.dirtyFiles) {
-			const entry = store.files.get(path);
-			if (entry) notify(entry.subscribers);
-		}
-		for (const folder of store.dirtyFolders) {
-			const entry = store.folders.get(folder);
-			if (entry) {
-				entry.snapshot = buildFolderSnapshot(app, folder);
-				notify(entry.subscribers);
-			}
-		}
-		for (const folder of store.dirtyChildFolders) {
-			const entry = store.childFolders.get(folder);
-			if (entry) {
-				entry.snapshot = buildChildFolders(app, folder);
-				notify(entry.subscribers);
-			}
-		}
-		store.dirtyFiles.clear();
-		store.dirtyFolders.clear();
-		store.dirtyChildFolders.clear();
+	const files = new ReactiveCache<MdSnapshot>(
+		(path) =>
+			buildSnapshot(app, path, lastData.get(path), app.metadataCache.getCache(path)),
+		requestFlush,
+	);
+	const folders = new ReactiveCache<MdItem[]>(
+		(folder) => buildFolderSnapshot(app, folder),
+		requestFlush,
+	);
+	const childFolders = new ReactiveCache<FolderNode[]>(
+		(folder) => buildChildFolders(app, folder),
+		requestFlush,
+	);
+
+	// Coalescência: uma rajada de eventos vira UM flush (logo, UM render por entrada).
+	flush = debounce(() => {
+		files.flush();
+		folders.flush();
+		childFolders.flush();
 	}, 24);
-
-	// Listagem de `.md` (useMarkdownFolder) — muda com create/delete/rename de arquivos.
-	const markFiles = (folder: string) => {
-		if (store.folders.has(folder)) {
-			store.dirtyFolders.add(folder);
-			store.flush();
-		}
-	};
-	// Listagem de subpastas (useChildFolders) — muda com create/delete/rename de pastas.
-	const markChildren = (folder: string) => {
-		if (store.childFolders.has(folder)) {
-			store.dirtyChildFolders.add(folder);
-			store.flush();
-		}
-	};
 
 	// Criar/remover um `index.md` muda se a pasta que o contém É um to-do, então a
 	// listagem do AVÔ (pasta-pai dessa pasta) precisa ser reconstruída.
@@ -216,25 +243,26 @@ function getStore(app: App): Store {
 	const onStructuralChange = (filePath: string) => {
 		// `parentOf(filePath)` é robusto a `file.parent` já destacado em deletes.
 		const parent = parentOf(filePath);
-		markFiles(parent);
-		markChildren(parent);
-		if (isIndex(filePath)) markChildren(parentOf(parent));
+		folders.invalidate(parent);
+		childFolders.invalidate(parent);
+		if (isIndex(filePath)) childFolders.invalidate(parentOf(parent));
 	};
+
+	const store: Store = { files, folders, childFolders, refs: [] };
 
 	// Listeners GLOBAIS únicos para o vault inteiro.
 	store.refs.push(
-		// Editar `index.md` (toggle de `done`) NÃO altera subpastas → só markFiles.
-		app.metadataCache.on("changed", (file, data, cache) => {
-			const entry = store.files.get(file.path);
-			if (entry) {
-				entry.snapshot = buildSnapshot(app, file.path, data, cache);
-				store.dirtyFiles.add(file.path);
-				store.flush();
-			}
-			markFiles(parentOf(file.path));
+		// Editar `index.md` (toggle de `done`) só afeta o arquivo e a listagem `.md` do pai.
+		app.metadataCache.on("changed", (file, data) => {
+			lastData.set(file.path, data);
+			files.invalidate(file.path);
+			folders.invalidate(parentOf(file.path));
 		}),
 		app.vault.on("create", (file) => onStructuralChange(file.path)),
-		app.vault.on("delete", (file) => onStructuralChange(file.path)),
+		app.vault.on("delete", (file) => {
+			lastData.delete(file.path);
+			onStructuralChange(file.path);
+		}),
 		app.vault.on("rename", (file, oldPath) => {
 			onStructuralChange(file.path);
 			onStructuralChange(oldPath);
@@ -245,48 +273,9 @@ function getStore(app: App): Store {
 	return store;
 }
 
-function ensureFileEntry(store: Store, path: string): FileEntry {
-	let entry = store.files.get(path);
-	if (!entry) {
-		entry = {
-			snapshot: buildSnapshot(
-				store.app,
-				path,
-				undefined,
-				store.app.metadataCache.getCache(path),
-			),
-			subscribers: new Set(),
-		};
-		store.files.set(path, entry);
-	}
-	return entry;
-}
-
-function ensureFolderEntry(store: Store, folder: string): FolderEntry {
-	let entry = store.folders.get(folder);
-	if (!entry) {
-		entry = {
-			folder,
-			snapshot: buildFolderSnapshot(store.app, folder),
-			subscribers: new Set(),
-		};
-		store.folders.set(folder, entry);
-	}
-	return entry;
-}
-
-function ensureChildEntry(store: Store, folder: string): ChildEntry {
-	let entry = store.childFolders.get(folder);
-	if (!entry) {
-		entry = {
-			folder,
-			snapshot: buildChildFolders(store.app, folder),
-			subscribers: new Set(),
-		};
-		store.childFolders.set(folder, entry);
-	}
-	return entry;
-}
+// ---------------------------------------------------------------------------
+// API pública: wrappers finos sobre as caches do store
+// ---------------------------------------------------------------------------
 
 /** Inscreve `cb` nas mudanças de um arquivo. `host` permite podar assinantes órfãos. */
 export function subscribe(
@@ -295,64 +284,47 @@ export function subscribe(
 	cb: () => void,
 	host: Node | null,
 ): () => void {
-	const store = getStore(app);
-	const entry = ensureFileEntry(store, path);
-	const sub: Subscriber = { cb, host };
-	entry.subscribers.add(sub);
-	return () => {
-		entry.subscribers.delete(sub);
-		if (entry.subscribers.size === 0) store.files.delete(path);
-	};
+	return getStore(app).files.subscribe(path, cb, host);
 }
 
-/** Inscreve `cb` nas mudanças da listagem de uma pasta (criação/remoção/frontmatter). */
+/** Inscreve `cb` nas mudanças da listagem de `.md` de uma pasta. */
 export function subscribeFolder(
 	app: App,
 	folder: string,
 	cb: () => void,
 	host: Node | null,
 ): () => void {
-	const store = getStore(app);
-	const entry = ensureFolderEntry(store, folder);
-	const sub: Subscriber = { cb, host };
-	entry.subscribers.add(sub);
-	return () => {
-		entry.subscribers.delete(sub);
-		if (entry.subscribers.size === 0) store.folders.delete(folder);
-	};
+	return getStore(app).folders.subscribe(folder, cb, host);
 }
 
-/** Inscreve `cb` nas mudanças das subpastas de `folder` (criação/remoção/rename de pastas). */
+/** Inscreve `cb` nas mudanças das subpastas de `folder` (criação/remoção/rename). */
 export function subscribeChildFolders(
 	app: App,
 	folder: string,
 	cb: () => void,
 	host: Node | null,
 ): () => void {
-	const store = getStore(app);
-	const entry = ensureChildEntry(store, folder);
-	const sub: Subscriber = { cb, host };
-	entry.subscribers.add(sub);
-	return () => {
-		entry.subscribers.delete(sub);
-		if (entry.subscribers.size === 0) store.childFolders.delete(folder);
-	};
+	return getStore(app).childFolders.subscribe(folder, cb, host);
 }
 
 /** Snapshot referencialmente estável de um arquivo. */
 export function getSnapshot(app: App, path: string): MdSnapshot {
-	return ensureFileEntry(getStore(app), path).snapshot;
+	return getStore(app).files.getSnapshot(path);
 }
 
-/** Snapshot referencialmente estável da listagem de uma pasta. */
+/** Snapshot referencialmente estável da listagem de `.md` de uma pasta. */
 export function getFolderSnapshot(app: App, folder: string): MdItem[] {
-	return ensureFolderEntry(getStore(app), folder).snapshot;
+	return getStore(app).folders.getSnapshot(folder);
 }
 
 /** Snapshot referencialmente estável das subpastas de uma pasta. */
 export function getChildFolders(app: App, folder: string): FolderNode[] {
-	return ensureChildEntry(getStore(app), folder).snapshot;
+	return getStore(app).childFolders.getSnapshot(folder);
 }
+
+// ---------------------------------------------------------------------------
+// Mutações (escrita no vault via API do Obsidian)
+// ---------------------------------------------------------------------------
 
 /**
  * Escrita em lote no frontmatter: uma chamada = uma escrita = um evento `changed`
