@@ -14,6 +14,7 @@ import {
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import type { App } from "obsidian";
 import { useState } from "react";
+import { sanitizeFolderName } from "@/examples/todoNaming";
 import {
 	ensureFolder,
 	type Subfolder,
@@ -35,7 +36,7 @@ async function createTodoFolder(
 	name: string,
 ): Promise<string> {
 	await ensureFolder(app, parent);
-	const safe = name.trim().replace(/[\\/:*?"<>|]/g, "-") || "untitled";
+	const safe = sanitizeFolderName(name);
 	let folder = `${parent}/${safe}`;
 	let n = 1;
 	while (app.vault.getAbstractFileByPath(folder)) {
@@ -62,11 +63,11 @@ function AddTodoInline({ parent }: { parent: string }) {
 	if (!open) {
 		return (
 			<ActionIcon
-				variant="subtle"
-				color="gray"
-				size="sm"
 				aria-label="adicionar subtarefa"
+				color="gray"
 				onClick={() => setOpen(true)}
+				size="sm"
+				variant="subtle"
 			>
 				<IconPlus size={14} />
 			</ActionIcon>
@@ -74,21 +75,21 @@ function AddTodoInline({ parent }: { parent: string }) {
 	}
 
 	return (
-		<Group gap={6} wrap="nowrap" w="100%">
+		<Group gap={6} w="100%" wrap="nowrap">
 			<TextInput
-				style={{ flex: 1 }}
-				size="xs"
 				autoFocus
-				placeholder="subtarefa…"
-				value={name}
+				onBlur={() => !name && setOpen(false)}
 				onChange={(e) => setName(e.currentTarget.value)}
 				onKeyDown={(e) => {
 					if (e.key === "Enter") add();
 					if (e.key === "Escape") setOpen(false);
 				}}
-				onBlur={() => !name && setOpen(false)}
+				placeholder="subtarefa…"
+				size="xs"
+				style={{ flex: 1 }}
+				value={name}
 			/>
-			<Button size="xs" variant="light" onClick={add}>
+			<Button onClick={add} size="xs" variant="light">
 				Add
 			</Button>
 		</Group>
@@ -98,7 +99,9 @@ function AddTodoInline({ parent }: { parent: string }) {
 /** Um to-do (pasta com index.md) e seus filhos (subpastas), recursivamente. */
 function TodoNode({ node }: { node: Subfolder }) {
 	const app = useApp();
-	const { frontmatter, exists, update } = useMarkdownFile(`${node.path}/index.md`);
+	const { frontmatter, exists, update } = useMarkdownFile(
+		`${node.path}/index.md`,
+	);
 	const { items: children, hostRef } = useSubfolders(node.path);
 
 	// É o EXEMPLO (não o core) que define "to-do = pasta + index.md": uma subpasta
@@ -111,9 +114,8 @@ function TodoNode({ node }: { node: Subfolder }) {
 	return (
 		<Box>
 			<span ref={hostRef} style={{ display: "none" }} />
-			<Group gap="xs" wrap="nowrap" justify="space-between" py={2}>
+			<Group gap="xs" justify="space-between" py={2} wrap="nowrap">
 				<Checkbox
-					radius="sm"
 					checked={done}
 					label={node.name}
 					onChange={() =>
@@ -121,23 +123,24 @@ function TodoNode({ node }: { node: Subfolder }) {
 							fm.done = !fm.done;
 						})
 					}
+					radius="sm"
 					styles={{
-						root: { flex: 1, minWidth: 0 },
 						label: {
+							color: done ? "var(--mantine-color-dimmed)" : undefined,
 							cursor: "pointer",
 							textDecoration: done ? "line-through" : undefined,
-							color: done ? "var(--mantine-color-dimmed)" : undefined,
 						},
+						root: { flex: 1, minWidth: 0 },
 					}}
 				/>
 				<Group gap={2} wrap="nowrap">
 					<AddTodoInline parent={node.path} />
 					<ActionIcon
-						variant="subtle"
-						color="red"
-						size="sm"
 						aria-label="excluir"
+						color="red"
 						onClick={() => trashPath(app, node.path)}
+						size="sm"
+						variant="subtle"
 					>
 						<IconTrash size={14} />
 					</ActionIcon>
@@ -175,12 +178,12 @@ export function TodoApp({ root }: { root: string }) {
 	};
 
 	return (
-		<Paper p="md" radius="md" withBorder maw={560}>
+		<Paper maw={560} p="md" radius="md" withBorder>
 			<span ref={hostRef} style={{ display: "none" }} />
 			<Group justify="space-between" mb="sm">
 				<Title order={4}>To-dos</Title>
 				{total > 0 && (
-					<Badge variant="light" color="gray" radius="sm">
+					<Badge color="gray" radius="sm" variant="light">
 						{total}
 					</Badge>
 				)}
@@ -188,21 +191,21 @@ export function TodoApp({ root }: { root: string }) {
 
 			<Group gap="xs" mb="md" wrap="nowrap">
 				<TextInput
-					style={{ flex: 1 }}
-					placeholder="Novo to-do…"
-					value={title}
 					onChange={(e) => setTitle(e.currentTarget.value)}
 					onKeyDown={(e) => {
 						if (e.key === "Enter") add();
 					}}
+					placeholder="Novo to-do…"
+					style={{ flex: 1 }}
+					value={title}
 				/>
-				<Button onClick={add} leftSection={<IconPlus size={16} />}>
+				<Button leftSection={<IconPlus size={16} />} onClick={add}>
 					Adicionar
 				</Button>
 			</Group>
 
 			{items.length === 0 ? (
-				<Text c="dimmed" size="sm" ta="center" py="lg">
+				<Text c="dimmed" py="lg" size="sm" ta="center">
 					Nenhum to-do ainda. Adicione o primeiro acima.
 				</Text>
 			) : (

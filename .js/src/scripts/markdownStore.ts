@@ -1,10 +1,4 @@
-import type {
-	App,
-	EventRef,
-	TAbstractFile,
-	TFile,
-	TFolder,
-} from "obsidian";
+import type { App, EventRef, TAbstractFile, TFile, TFolder } from "obsidian";
 
 /** Debounce local (evita import de runtime do módulo `obsidian`, indisponível no eval). */
 function debounce(cb: () => void, timeout: number): () => void {
@@ -19,17 +13,17 @@ function debounce(cb: () => void, timeout: number): () => void {
 }
 
 export interface MdSnapshot {
-	file: TFile | null;
-	frontmatter: Record<string, unknown>;
 	/** Corpo cru do arquivo, sem o bloco de frontmatter. */
 	body: string;
 	exists: boolean;
+	file: TFile | null;
+	frontmatter: Record<string, unknown>;
 }
 
 /** Uma subpasta de uma pasta (path absoluto + nome do diretório). */
 export interface Subfolder {
-	path: string;
 	name: string;
+	path: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,13 +31,13 @@ export interface Subfolder {
 // ---------------------------------------------------------------------------
 
 /** Pasta-pai de um path (`"a/b.md"` → `"a"`, raiz → `"/"`). */
-function parentOf(path: string): string {
+export function parentOf(path: string): string {
 	const i = path.lastIndexOf("/");
 	return i === -1 ? "/" : path.slice(0, i);
 }
 
 /** Remove o bloco `--- ... ---` do início, devolvendo só o corpo. */
-function stripFrontmatter(
+export function stripFrontmatter(
 	data: string,
 	cache?: import("obsidian").CachedMetadata | null,
 ): string {
@@ -61,15 +55,15 @@ function buildSnapshot(
 	const file = app.vault.getAbstractFileByPath(path) as TFile | null;
 	const fm = (cache?.frontmatter ?? {}) as Record<string, unknown>;
 	return {
-		file,
-		frontmatter: { ...fm },
 		body: stripFrontmatter(data ?? "", cache),
 		exists: !!file,
+		file,
+		frontmatter: { ...fm },
 	};
 }
 
 /** Type guard sem `instanceof` (módulo `obsidian` não é bundlável no eval). */
-function isFolder(f: TAbstractFile): f is TFolder {
+export function isFolder(f: TAbstractFile): f is TFolder {
 	return (f as TFolder).children !== undefined;
 }
 
@@ -80,7 +74,7 @@ function buildSubfolders(app: App, folder: string): Subfolder[] {
 	return dir.children
 		.filter(isFolder)
 		.sort((a, b) => a.name.localeCompare(b.name))
-		.map((c) => ({ path: c.path, name: c.name }));
+		.map((c) => ({ name: c.name, path: c.path }));
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +97,7 @@ interface CacheEntry<T> {
  * invalidado, coalescido pelo `requestFlush` compartilhado do store. Cada coleção
  * reativa (snapshots de arquivo, listagens de subpastas) é uma instância desta.
  */
-class ReactiveCache<T> {
+export class ReactiveCache<T> {
 	private readonly entries = new Map<string, CacheEntry<T>>();
 	private readonly dirty = new Set<string>();
 
@@ -168,8 +162,8 @@ class ReactiveCache<T> {
 
 interface Store {
 	files: ReactiveCache<MdSnapshot>;
-	subfolders: ReactiveCache<Subfolder[]>;
 	refs: EventRef[];
+	subfolders: ReactiveCache<Subfolder[]>;
 }
 
 const KEY = "__mdStore__";
@@ -191,7 +185,12 @@ function getStore(app: App): Store {
 
 	const files = new ReactiveCache<MdSnapshot>(
 		(path) =>
-			buildSnapshot(app, path, lastData.get(path), app.metadataCache.getCache(path)),
+			buildSnapshot(
+				app,
+				path,
+				lastData.get(path),
+				app.metadataCache.getCache(path),
+			),
 		requestFlush,
 	);
 	const subfolders = new ReactiveCache<Subfolder[]>(
@@ -213,7 +212,7 @@ function getStore(app: App): Store {
 		subfolders.invalidate(parentOf(path));
 	};
 
-	const store: Store = { files, subfolders, refs: [] };
+	const store: Store = { files, refs: [], subfolders };
 
 	// Listeners GLOBAIS únicos para o vault inteiro.
 	store.refs.push(
