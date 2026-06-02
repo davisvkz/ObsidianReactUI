@@ -71,6 +71,7 @@ function collectMdFiles(
 function buildFolderFiles(
 	app: App,
 	lastData: Map<string, string>,
+	lastCache: Map<string, import("obsidian").CachedMetadata>,
 	key: string,
 ): MdSnapshot[] {
 	const recursive = key.startsWith("r:");
@@ -84,7 +85,7 @@ function buildFolderFiles(
 			app,
 			f.path,
 			lastData.get(f.path),
-			app.metadataCache.getCache(f.path),
+			lastCache.get(f.path) ?? app.metadataCache.getCache(f.path),
 		),
 	);
 }
@@ -108,11 +109,12 @@ const STORE_KEY = "__mdStore__";
  * o Dataview faz a cada render — os listeners globais são registrados UMA vez.
  */
 function getStore(app: App): Store {
-	const w = window as unknown as Record<string, Store | undefined>;
+	const w = globalThis as unknown as Record<string, Store | undefined>;
 	const existing = w[STORE_KEY];
 	if (existing) return existing;
 
 	const lastData = new Map<string, string>();
+	const lastCache = new Map<string, import("obsidian").CachedMetadata>();
 
 	let flush: () => void = () => {};
 	const requestFlush = () => flush();
@@ -123,7 +125,7 @@ function getStore(app: App): Store {
 				app,
 				path,
 				lastData.get(path),
-				app.metadataCache.getCache(path),
+				lastCache.get(path) ?? app.metadataCache.getCache(path),
 			),
 		requestFlush,
 	);
@@ -132,7 +134,7 @@ function getStore(app: App): Store {
 		requestFlush,
 	);
 	const folderFiles = new ReactiveCache<MdSnapshot[]>(
-		(key) => buildFolderFiles(app, lastData, key),
+		(key) => buildFolderFiles(app, lastData, lastCache, key),
 		requestFlush,
 	);
 
@@ -156,11 +158,15 @@ function getStore(app: App): Store {
 	const store: Store = { files, folderFiles, refs: [], subfolders };
 
 	store.refs.push(
-		app.metadataCache.on("changed", (file, data) => {
-			lastData.set(file.path, data);
-			files.invalidate(file.path);
-			invalidateContainingFolders(file.path);
-		}),
+		app.metadataCache.on(
+			"changed",
+			(file, data, cache: import("obsidian").CachedMetadata) => {
+				lastData.set(file.path, data);
+				lastCache.set(file.path, cache);
+				files.invalidate(file.path);
+				invalidateContainingFolders(file.path);
+			},
+		),
 		app.vault.on("create", (file) => onStructuralChange(file.path)),
 		app.vault.on("delete", (file) => {
 			lastData.delete(file.path);
