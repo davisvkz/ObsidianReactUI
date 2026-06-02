@@ -1,5 +1,5 @@
 import type { App, EventRef, TFile, TFolder } from "obsidian";
-import { containingFolderKeys, folderFilesKey, parentOf } from "@/lib/path";
+import { containingFolderKeys, parentOf } from "@/lib/path";
 import { ReactiveCache } from "@/lib/reactiveCache";
 import {
 	isFolder,
@@ -201,16 +201,11 @@ export function subscribeSubfolders(
 
 export function subscribeFolderFiles(
 	app: App,
-	folder: string,
-	recursive: boolean,
+	key: string,
 	cb: () => void,
 	host: Node | null,
 ): () => void {
-	return getStore(app).folderFiles.subscribe(
-		folderFilesKey(folder, recursive),
-		cb,
-		host,
-	);
+	return getStore(app).folderFiles.subscribe(key, cb, host);
 }
 
 export function getSnapshot(app: App, path: string): MdSnapshot {
@@ -221,12 +216,8 @@ export function getSubfolders(app: App, folder: string): Subfolder[] {
 	return getStore(app).subfolders.getSnapshot(folder);
 }
 
-export function getFolderFiles(
-	app: App,
-	folder: string,
-	recursive: boolean,
-): MdSnapshot[] {
-	return getStore(app).folderFiles.getSnapshot(folderFilesKey(folder, recursive));
+export function getFolderFiles(app: App, key: string): MdSnapshot[] {
+	return getStore(app).folderFiles.getSnapshot(key);
 }
 
 // ---------------------------------------------------------------------------

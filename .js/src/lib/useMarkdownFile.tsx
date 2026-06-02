@@ -102,18 +102,10 @@ export function useFolderFiles(
 	folder: string,
 	recursive = true,
 ): UseFolderFiles {
-	const key = folderFilesKey(folder, recursive);
-
-	const subscribeFn = useCallback(
-		(app: App, _key: string, cb: () => void, host: Node | null) =>
-			subscribeFolderFiles(app, folder, recursive, cb, host),
-		[folder, recursive],
+	const { value, hostRef } = useStoreValue(
+		subscribeFolderFiles,
+		getFolderFiles,
+		folderFilesKey(folder, recursive),
 	);
-	const readFn = useCallback(
-		(app: App, _key: string) => getFolderFiles(app, folder, recursive),
-		[folder, recursive],
-	);
-
-	const { value, hostRef } = useStoreValue(subscribeFn, readFn, key);
 	return { hostRef, items: value };
 }
