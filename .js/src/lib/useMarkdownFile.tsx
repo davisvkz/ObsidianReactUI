@@ -1,16 +1,21 @@
 import type { App } from "obsidian";
 import { useCallback, useContext, useRef, useSyncExternalStore } from "react";
+import { folderFilesKey } from "@/lib/path";
+import { ReactiveCache } from "@/lib/reactiveCache";
+import { type MdSnapshot, type Subfolder } from "@/lib/snapshot";
 import {
-	type MdSnapshot,
-	type Subfolder,
+	getFolderFiles,
 	getSnapshot,
 	getSubfolders,
 	subscribe,
+	subscribeFolderFiles,
 	subscribeSubfolders,
 	updateBody,
 	updateFrontmatter,
-} from "@/lib/markdownStore";
+} from "@/lib/store";
 import { AppContext } from "@/lib/utils";
+
+export { ReactiveCache };
 
 export function useApp(): App {
 	const app = useContext(AppContext);
@@ -45,7 +50,7 @@ function useStoreValue<T>(
 	);
 	const value = useSyncExternalStore(sub, () => read(app, key));
 
-	return { app, value, hostRef };
+	return { app, hostRef, value };
 }
 
 export interface UseMarkdownFile extends MdSnapshot {
@@ -69,8 +74,8 @@ export function useMarkdownFile(path: string): UseMarkdownFile {
 }
 
 export interface UseSubfolders {
-	items: Subfolder[];
 	hostRef: React.RefObject<HTMLSpanElement | null>;
+	items: Subfolder[];
 }
 
 /** Lista (reativamente) as subpastas de uma pasta. */
@@ -80,5 +85,35 @@ export function useSubfolders(folder: string): UseSubfolders {
 		getSubfolders,
 		folder,
 	);
-	return { items: value, hostRef };
+	return { hostRef, items: value };
+}
+
+export interface UseFolderFiles {
+	hostRef: React.RefObject<HTMLSpanElement | null>;
+	items: MdSnapshot[];
+}
+
+/**
+ * Lê (reativamente) todos os `.md` de `folder` como `MdSnapshot[]`.
+ * `recursive=true` (padrão) inclui subpastas; `false` lista só o nível direto.
+ * O array é referencialmente estável entre renders sem mudança.
+ */
+export function useFolderFiles(
+	folder: string,
+	recursive = true,
+): UseFolderFiles {
+	const key = folderFilesKey(folder, recursive);
+
+	const subscribeFn = useCallback(
+		(app: App, _key: string, cb: () => void, host: Node | null) =>
+			subscribeFolderFiles(app, folder, recursive, cb, host),
+		[folder, recursive],
+	);
+	const readFn = useCallback(
+		(app: App, _key: string) => getFolderFiles(app, folder, recursive),
+		[folder, recursive],
+	);
+
+	const { value, hostRef } = useStoreValue(subscribeFn, readFn, key);
+	return { hostRef, items: value };
 }

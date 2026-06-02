@@ -1,15 +1,22 @@
-import { MantineProvider } from "@mantine/core";
+import {
+	type MantineColorScheme,
+	MantineProvider,
+	type MantineThemeOverride,
+} from "@mantine/core";
 import type { App } from "obsidian";
 import type { DataviewInlineApi } from "obsidian-dataview/lib/api/inline-api";
 import type React from "react";
 import { createContext, useEffect, useRef } from "react";
-import { type Root, createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 
 /** O `App` do Obsidian, disponibilizado a toda a árvore React. */
 export const AppContext = createContext<App | null>(null);
 
 function resolveApp(dv: DataviewInlineApi): App {
-	return (dv as unknown as { app: App }).app ?? (window as unknown as { app: App }).app;
+	return (
+		(dv as unknown as { app: App }).app ??
+		(window as unknown as { app: App }).app
+	);
 }
 
 function ShadowRoot({ children }: { children: React.ReactNode }) {
@@ -47,10 +54,19 @@ export function render(dv: DataviewInlineApi, children: React.ReactNode) {
 
 const ShadowPortalContext = createContext<HTMLElement | null>(null);
 
+export interface MantineRenderOptions {
+	/** Esquema de cores padrão (default: `"dark"`). */
+	defaultColorScheme?: MantineColorScheme;
+	/** Tema Mantine adicional (mesclado sobre o padrão). */
+	theme?: MantineThemeOverride;
+}
+
 export function mantineRender(
 	dv: DataviewInlineApi,
 	children: React.ReactNode,
+	options: MantineRenderOptions = {},
 ) {
+	const { theme = {}, defaultColorScheme = "dark" } = options;
 	const app = resolveApp(dv);
 
 	// Desmonta o root do render anterior (o Dataview pode remover o container sem
@@ -86,10 +102,16 @@ export function mantineRender(
 	root.render(
 		<AppContext.Provider value={app}>
 			<MantineProvider
-				defaultColorScheme="dark"
 				cssVariablesSelector=":host > div"
+				defaultColorScheme={defaultColorScheme}
 				getRootElement={() => mount}
-				theme={{ components: { Portal: { defaultProps: { target: mount } } } }}
+				theme={{
+					...theme,
+					components: {
+						Portal: { defaultProps: { target: mount } },
+						...theme.components,
+					},
+				}}
 			>
 				{children}
 			</MantineProvider>
