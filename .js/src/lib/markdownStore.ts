@@ -288,6 +288,33 @@ export async function updateFrontmatter(
 	if (file) await app.fileManager.processFrontMatter(file, fn);
 }
 
+/** Offset onde o corpo começa (logo após o bloco `--- ... ---\n`). 0 = sem frontmatter. */
+function bodyOffset(data: string): number {
+	if (!data.startsWith("---")) return 0;
+	const close = data.indexOf("\n---", 3);
+	if (close === -1) return 0;
+	const after = close + 4; // past "\n---"
+	return data[after] === "\n" ? after + 1 : after;
+}
+
+/**
+ * Substitui o corpo do arquivo (tudo após o bloco de frontmatter) de forma atômica.
+ * O frontmatter existente é preservado; se o arquivo não tiver frontmatter o conteúdo
+ * inteiro é substituído.
+ */
+export async function updateBody(
+	app: App,
+	path: string,
+	body: string,
+): Promise<void> {
+	const file = app.vault.getAbstractFileByPath(path) as TFile | null;
+	if (!file) return;
+	await app.vault.process(file, (data) => {
+		const offset = bodyOffset(data);
+		return offset === 0 ? body : data.slice(0, offset) + body;
+	});
+}
+
 /** Garante a existência de uma pasta. */
 export async function ensureFolder(app: App, folder: string): Promise<void> {
 	if (folder !== "/" && !app.vault.getFolderByPath(folder)) {

@@ -7,6 +7,7 @@ import {
 	getSubfolders,
 	subscribe,
 	subscribeSubfolders,
+	updateBody,
 	updateFrontmatter,
 } from "@/lib/markdownStore";
 import { AppContext } from "@/lib/utils";
@@ -50,8 +51,10 @@ function useStoreValue<T>(
 export interface UseMarkdownFile extends MdSnapshot {
 	/** Ancore num elemento renderizado para permitir poda de assinantes órfãos. */
 	hostRef: React.RefObject<HTMLSpanElement | null>;
-	/** Escrita em lote: altere quantas propriedades quiser dentro de `fn`. */
+	/** Escrita em lote no frontmatter: altere quantas propriedades quiser dentro de `fn`. */
 	update: (fn: (frontmatter: Record<string, unknown>) => void) => Promise<void>;
+	/** Substitui o corpo do arquivo (tudo após o frontmatter) atomicamente. */
+	updateBody: (body: string) => Promise<void>;
 }
 
 /** Lê (reativamente) o frontmatter + corpo de um `.md` e expõe escrita em lote. */
@@ -61,6 +64,7 @@ export function useMarkdownFile(path: string): UseMarkdownFile {
 		...value,
 		hostRef,
 		update: (fn) => updateFrontmatter(app, path, fn),
+		updateBody: (body) => updateBody(app, path, body),
 	};
 }
 
