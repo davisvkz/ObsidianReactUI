@@ -22,7 +22,7 @@ import type { App } from "obsidian";
 import { useState } from "react";
 import { isoDay, sessionFileName } from "@/examples/estudei/format";
 import type { Categoria } from "@/examples/estudei/parse";
-import type { Subfolder } from "@/lib/markdownStore";
+import type { Subfolder } from "@/lib";
 
 interface CronometroProps {
 	app: App;

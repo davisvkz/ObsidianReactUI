@@ -37,13 +37,13 @@ import {
 	parseTopicos,
 } from "@/examples/estudei/parse";
 import { StatCard } from "@/examples/estudei/StatCard";
-import { parentOf } from "@/lib/markdownStore";
 import {
+	parentOf,
 	useApp,
 	useFolderFiles,
 	useMarkdownFile,
 	useSubfolders,
-} from "@/lib/useMarkdownFile";
+} from "@/lib";
 
 const FRASES = [
 	"Se você quer chegar onde a maioria não chega, faça o que a maioria não faz.",
@@ -75,17 +75,17 @@ export function Home({ root }: HomeProps) {
 	const [cronometroOpen, setCronometroOpen] = useState(false);
 
 	// Todas as disciplinas (subpastas)
-	const { items: discFolders, hostRef: discHostRef } = useSubfolders(root);
+	const { items: discFolders } = useSubfolders(root);
 	const visibleDiscs = discFolders.filter((d) => !d.name.startsWith("_"));
 
 	// Metas (arquivo singleton)
-	const { frontmatter: metasFm, hostRef: metasHostRef } = useMarkdownFile(
+	const { frontmatter: metasFm } = useMarkdownFile(
 		`${root}/_config/metas.md`,
 	);
 	const metas = parseMetas(metasFm);
 
 	// Todos os arquivos .md do vault abaixo de `root` (recursivo)
-	const { items: allFiles, hostRef: filesHostRef } = useFolderFiles(root, true);
+	const { items: allFiles } = useFolderFiles(root, true);
 
 	// Plano: lido de allFiles para garantir reatividade via o mesmo folderFiles cache
 	const planoFm = useMemo(
@@ -175,11 +175,6 @@ export function Home({ root }: HomeProps) {
 
 	return (
 		<Stack gap="lg" p="md" style={{ maxWidth: 1100 }}>
-			{/* Hidden anchors para poda de assinantes órfãos */}
-			<span ref={discHostRef} style={{ display: "none" }} />
-			<span ref={metasHostRef} style={{ display: "none" }} />
-			<span ref={filesHostRef} style={{ display: "none" }} />
-
 			{/* Cabeçalho */}
 			<Group justify="space-between" wrap="nowrap">
 				<Title order={2}>Home</Title>

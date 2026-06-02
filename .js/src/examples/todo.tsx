@@ -19,12 +19,10 @@ import {
 	ensureFolder,
 	type Subfolder,
 	trashPath,
-} from "@/lib/markdownStore";
-import {
 	useApp,
 	useMarkdownFile,
 	useSubfolders,
-} from "@/lib/useMarkdownFile";
+} from "@/lib";
 
 /**
  * Convenção do EXEMPLO to-do (não do core): um to-do é uma pasta com `index.md`
@@ -102,7 +100,7 @@ function TodoNode({ node }: { node: Subfolder }) {
 	const { frontmatter, exists, update } = useMarkdownFile(
 		`${node.path}/index.md`,
 	);
-	const { items: children, hostRef } = useSubfolders(node.path);
+	const { items: children } = useSubfolders(node.path);
 
 	// É o EXEMPLO (não o core) que define "to-do = pasta + index.md": uma subpasta
 	// sem index.md (ou cuja nota foi deletada) simplesmente não renderiza — some o
@@ -113,7 +111,6 @@ function TodoNode({ node }: { node: Subfolder }) {
 
 	return (
 		<Box>
-			<span ref={hostRef} style={{ display: "none" }} />
 			<Group gap="xs" justify="space-between" py={2} wrap="nowrap">
 				<Checkbox
 					checked={done}
@@ -166,7 +163,7 @@ function TodoNode({ node }: { node: Subfolder }) {
 /** App de exemplo: árvore de to-dos sob `root` (uma pasta-container, sem index.md). */
 export function TodoApp({ root }: { root: string }) {
 	const app = useApp();
-	const { items, hostRef } = useSubfolders(root);
+	const { items } = useSubfolders(root);
 	const total = items.length;
 	const [title, setTitle] = useState("");
 
@@ -179,7 +176,6 @@ export function TodoApp({ root }: { root: string }) {
 
 	return (
 		<Paper maw={560} p="md" radius="md" withBorder>
-			<span ref={hostRef} style={{ display: "none" }} />
 			<Group justify="space-between" mb="sm">
 				<Title order={4}>To-dos</Title>
 				{total > 0 && (

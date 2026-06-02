@@ -87,9 +87,10 @@ describe("store — lastCache: usa CachedMetadata do evento 'changed'", () => {
 		// Cria a entrada no cache via subscribe (força ensure)
 		const unsub = subscribeFolderFiles(
 			app as never,
-			"r:estudei",
+			"estudei",
 			() => {},
 			null,
+			true,
 		);
 
 		// Acessa snapshot (cria entry em files via getSnapshot)
@@ -121,13 +122,14 @@ describe("store — lastCache: usa CachedMetadata do evento 'changed'", () => {
 		// Força criação do entry folderFiles
 		const unsub = subscribeFolderFiles(
 			app as never,
-			"r:estudei",
+			"estudei",
 			() => {},
 			null,
+			true,
 		);
 
 		// Estado inicial: tudo vazio (getCache retorna null)
-		const files0 = getFolderFiles(app as never, "r:estudei");
+		const files0 = getFolderFiles(app as never, "estudei", true);
 		expect(files0.find((f) => f.file?.path === "estudei/index.md")?.frontmatter).toEqual({});
 
 		// Sessão indexada (getCache continua null para estudei/index.md)
@@ -145,7 +147,7 @@ describe("store — lastCache: usa CachedMetadata do evento 'changed'", () => {
 		vi.advanceTimersByTime(100); // segundo flush (plano)
 
 		// Após o flush o plano deve aparecer
-		const files1 = getFolderFiles(app as never, "r:estudei");
+		const files1 = getFolderFiles(app as never, "estudei", true);
 		const plano = files1.find((f) => f.file?.path === "estudei/index.md");
 		expect(plano?.frontmatter.nome).toBe("Plano PRF");
 

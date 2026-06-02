@@ -13,17 +13,15 @@ import {
 	aggregateEstatisticas,
 	buildTimeSeries,
 	editalProgresso,
-	totalDuracaoMin,
 } from "@/examples/estudei/aggregate";
 import {
 	formatDuracao,
 	formatPercentual,
 	isoDay,
 } from "@/examples/estudei/format";
-import { parseMetas, parseSession, parseTopicos } from "@/examples/estudei/parse";
+import { parseSession, parseTopicos } from "@/examples/estudei/parse";
 import { StatCard } from "@/examples/estudei/StatCard";
-import { parentOf } from "@/lib/markdownStore";
-import { useFolderFiles, useMarkdownFile, useSubfolders } from "@/lib/useMarkdownFile";
+import { parentOf, useFolderFiles } from "@/lib";
 
 interface EstatisticasProps {
 	root: string;
@@ -32,13 +30,7 @@ interface EstatisticasProps {
 export function Estatisticas({ root }: EstatisticasProps) {
 	const today = isoDay(new Date());
 
-	const { items: discFolders, hostRef: discHostRef } = useSubfolders(root);
-	const { items: allFiles, hostRef: filesHostRef } = useFolderFiles(root, true);
-	const { frontmatter: metasFm, hostRef: metasHostRef } = useMarkdownFile(
-		`${root}/_config/metas.md`,
-	);
-
-	const metas = parseMetas(metasFm);
+	const { items: allFiles } = useFolderFiles(root, true);
 
 	const allSessions = useMemo(
 		() =>
@@ -128,10 +120,6 @@ export function Estatisticas({ root }: EstatisticasProps) {
 
 	return (
 		<Stack gap="lg" p="md" style={{ maxWidth: 1100 }}>
-			<span ref={discHostRef} style={{ display: "none" }} />
-			<span ref={filesHostRef} style={{ display: "none" }} />
-			<span ref={metasHostRef} style={{ display: "none" }} />
-
 			<Title order={2}>Estatísticas</Title>
 
 			{/* Cards de resumo */}

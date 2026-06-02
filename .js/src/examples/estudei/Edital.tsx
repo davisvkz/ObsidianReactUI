@@ -22,7 +22,7 @@ import {
 import { formatPercentual, percentBadgeColor } from "@/examples/estudei/format";
 import type { Topico } from "@/examples/estudei/parse";
 import { parseTopicos } from "@/examples/estudei/parse";
-import { useMarkdownFile, useSubfolders } from "@/lib/useMarkdownFile";
+import { useMarkdownFile, useSubfolders } from "@/lib";
 
 // ---------------------------------------------------------------------------
 // Linha de tópico individual
@@ -162,9 +162,7 @@ interface DisciplinaEditalProps {
 }
 
 function DisciplinaEdital({ discPath }: DisciplinaEditalProps) {
-	const { frontmatter, update, hostRef } = useMarkdownFile(
-		`${discPath}/index.md`,
-	);
+	const { frontmatter, update } = useMarkdownFile(`${discPath}/index.md`);
 	const topicos = parseTopicos(frontmatter);
 	const progresso = editalProgresso(topicos);
 
@@ -202,7 +200,6 @@ function DisciplinaEdital({ discPath }: DisciplinaEditalProps) {
 
 	return (
 		<Box>
-			<span ref={hostRef} style={{ display: "none" }} />
 			<Group justify="space-between" mb="xs">
 				<Group gap="xs">
 					<Text c="dimmed" size="sm">
@@ -265,7 +262,7 @@ interface EditalProps {
 }
 
 export function Edital({ root }: EditalProps) {
-	const { items: disciplinas, hostRef } = useSubfolders(root);
+	const { items: disciplinas } = useSubfolders(root);
 	const visibleDiscs = disciplinas.filter((d) => !d.name.startsWith("_"));
 	const [selected, setSelected] = useState<string | null>(
 		visibleDiscs[0]?.name ?? null,
@@ -279,7 +276,6 @@ export function Edital({ root }: EditalProps) {
 
 	return (
 		<Stack gap="md">
-			<span ref={hostRef} style={{ display: "none" }} />
 			<Group justify="space-between" wrap="nowrap">
 				<Title order={3}>Edital Verticalizado</Title>
 				<Select

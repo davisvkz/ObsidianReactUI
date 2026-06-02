@@ -1,5 +1,5 @@
 /**
- * Testes do barrel markdownStore — verificam que todos os símbolos públicos
+ * Testes do barrel @/lib — verificam que todos os símbolos públicos
  * são re-exportados corretamente pelos módulos internos.
  */
 import { describe, expect, it } from "vitest";
@@ -10,9 +10,9 @@ import {
 	parentOf,
 	ReactiveCache,
 	stripFrontmatter,
-} from "@/lib/markdownStore";
+} from "@/lib";
 
-describe("markdownStore barrel — re-exports", () => {
+describe("lib barrel — re-exports", () => {
 	it("exporta parentOf", () => {
 		expect(parentOf("a/b.md")).toBe("a");
 	});

@@ -21,13 +21,13 @@ import { parseRevisoesConfig, parseSession, revisaoKey } from "@/examples/estude
 import { revisoesPendentes } from "@/examples/estudei/revisao";
 import type { RevisaoOcorrencia } from "@/examples/estudei/revisao";
 import { Cronometro } from "@/examples/estudei/Cronometro";
-import { parentOf } from "@/lib/markdownStore";
 import {
+	parentOf,
 	useApp,
 	useFolderFiles,
 	useMarkdownFile,
 	useSubfolders,
-} from "@/lib/useMarkdownFile";
+} from "@/lib";
 
 interface RevisoesProps {
 	root: string;
@@ -199,12 +199,11 @@ export function Revisoes({ root }: RevisoesProps) {
 	const app = useApp();
 	const today = isoDay(new Date());
 
-	const { items: discFolders, hostRef: discHostRef } = useSubfolders(root);
-	const { items: allFiles, hostRef: filesHostRef } = useFolderFiles(root, true);
+	const { items: discFolders } = useSubfolders(root);
+	const { items: allFiles } = useFolderFiles(root, true);
 	const {
 		frontmatter: revisoesConfigFm,
 		update: updateRevisoes,
-		hostRef: revisoesHostRef,
 	} = useMarkdownFile(`${root}/_config/revisoes.md`);
 
 	const [cronometroOpen, setCronometroOpen] = useState(false);
@@ -294,10 +293,6 @@ export function Revisoes({ root }: RevisoesProps) {
 
 	return (
 		<Stack gap="md" p="md" style={{ maxWidth: 900 }}>
-			<span ref={discHostRef} style={{ display: "none" }} />
-			<span ref={filesHostRef} style={{ display: "none" }} />
-			<span ref={revisoesHostRef} style={{ display: "none" }} />
-
 			<Group justify="space-between">
 				<Title order={2}>Revisões</Title>
 				<Button

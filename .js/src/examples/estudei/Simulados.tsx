@@ -28,12 +28,11 @@ import { parseSimulado } from "@/examples/estudei/parse";
 import type { SimuladoAgg } from "@/examples/estudei/aggregate";
 import { StatCard } from "@/examples/estudei/StatCard";
 import {
+	ensureFolder,
 	useApp,
 	useFolderFiles,
-	useMarkdownFile,
 	useSubfolders,
-} from "@/lib/useMarkdownFile";
-import { ensureFolder } from "@/lib/store";
+} from "@/lib";
 
 // ---------------------------------------------------------------------------
 // Modal de novo simulado
@@ -359,8 +358,8 @@ export function Simulados({ root }: SimuladosProps) {
 	const app = useApp();
 	const [novoOpen, setNovoOpen] = useState(false);
 
-	const { items: discFolders, hostRef: discHostRef } = useSubfolders(root);
-	const { items: simFiles, hostRef: simHostRef } = useFolderFiles(`${root}/_simulados`, false);
+	const { items: discFolders } = useSubfolders(root);
+	const { items: simFiles } = useFolderFiles(`${root}/_simulados`, false);
 
 	const discNames = discFolders.filter((d) => !d.name.startsWith("_")).map((d) => d.name);
 
@@ -389,8 +388,6 @@ export function Simulados({ root }: SimuladosProps) {
 
 	return (
 		<Stack gap="lg" p="md" style={{ maxWidth: 1000 }}>
-			<span ref={discHostRef} style={{ display: "none" }} />
-			<span ref={simHostRef} style={{ display: "none" }} />
 
 			<Group justify="space-between">
 				<Title order={2}>Simulados</Title>

@@ -21,13 +21,12 @@ import { useMemo, useState } from "react";
 import { cicloProgresso } from "@/examples/estudei/aggregate";
 import { formatDuracao, isoDay } from "@/examples/estudei/format";
 import { parseCiclo, parseSession } from "@/examples/estudei/parse";
-import { parentOf } from "@/lib/markdownStore";
 import {
-	useApp,
+	parentOf,
 	useFolderFiles,
 	useMarkdownFile,
 	useSubfolders,
-} from "@/lib/useMarkdownFile";
+} from "@/lib";
 
 const DISC_COLORS = [
 	"mint.5", "blue.5", "grape.5", "orange.5", "pink.5",
@@ -137,10 +136,9 @@ export function Planejamento({ root }: PlanejamentoProps) {
 	const today = isoDay(new Date());
 	const cicloPath = `${root}/_config/ciclo.md`;
 
-	const { items: discFolders, hostRef: discHostRef } = useSubfolders(root);
-	const { items: allFiles, hostRef: filesHostRef } = useFolderFiles(root, true);
-	const { frontmatter: cicloFm, update: updateCiclo, hostRef: cicloHostRef } =
-		useMarkdownFile(cicloPath);
+	const { items: discFolders } = useSubfolders(root);
+	const { items: allFiles } = useFolderFiles(root, true);
+	const { frontmatter: cicloFm, update: updateCiclo } = useMarkdownFile(cicloPath);
 
 	const [editOpen, setEditOpen] = useState(false);
 	const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
@@ -207,9 +205,6 @@ export function Planejamento({ root }: PlanejamentoProps) {
 	if (!ciclo) {
 		return (
 			<Stack gap="md" p="md">
-				<span ref={discHostRef} style={{ display: "none" }} />
-				<span ref={cicloHostRef} style={{ display: "none" }} />
-				<span ref={filesHostRef} style={{ display: "none" }} />
 				<Title order={2}>Planejamento</Title>
 				<Text c="dimmed" size="sm">
 					Nenhum ciclo configurado em{" "}
@@ -237,10 +232,6 @@ export function Planejamento({ root }: PlanejamentoProps) {
 
 	return (
 		<Stack gap="lg" p="md" style={{ maxWidth: 1000 }}>
-			<span ref={discHostRef} style={{ display: "none" }} />
-			<span ref={cicloHostRef} style={{ display: "none" }} />
-			<span ref={filesHostRef} style={{ display: "none" }} />
-
 			<Group justify="space-between" wrap="nowrap">
 				<Title order={2}>Planejamento</Title>
 				<Group gap="xs">

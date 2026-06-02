@@ -1,19 +1,20 @@
 import type { App } from "obsidian";
-import { useCallback, useContext, useRef, useSyncExternalStore } from "react";
-import { folderFilesKey } from "@/lib/path";
+import { useCallback, useContext } from "react";
+import { useSyncExternalStore } from "react";
 import { ReactiveCache } from "@/lib/reactiveCache";
+import { HostContext } from "@/lib/render";
+import { AppContext } from "@/lib/render";
 import { type MdSnapshot, type Subfolder } from "@/lib/snapshot";
 import {
 	getFolderFiles,
 	getSnapshot,
 	getSubfolders,
-	subscribe,
+	subscribeFile,
 	subscribeFolderFiles,
 	subscribeSubfolders,
 	updateBody,
 	updateFrontmatter,
 } from "@/lib/store";
-import { AppContext } from "@/lib/utils";
 
 export { ReactiveCache };
 
@@ -32,30 +33,30 @@ type SubscribeFn = (
 type ReadFn<T> = (app: App, key: string) => T;
 
 /**
- * Liga uma `key` a uma cache reativa do store via `useSyncExternalStore`. Estabiliza
- * `subscribe` com `useCallback` (senão o React re-inscreve a cada render → loop) e
- * expõe um `hostRef` para a cache podar assinantes órfãos. Base dos hooks abaixo.
+ * Liga uma `key` a uma cache reativa do store via `useSyncExternalStore`.
+ * Estabiliza `subscribe` com `useCallback` para evitar re-inscrições a cada render.
+ * Usa `HostContext` como sentinela de assinante órfão — quando o Dataview arranca
+ * o container do shadow DOM o `mount` fica `isConnected === false` e a cache poda
+ * automaticamente o assinante.
  */
 function useStoreValue<T>(
 	subscribeFn: SubscribeFn,
 	read: ReadFn<T>,
 	key: string,
-): { app: App; value: T; hostRef: React.RefObject<HTMLSpanElement | null> } {
+): { app: App; value: T } {
 	const app = useApp();
-	const hostRef = useRef<HTMLSpanElement>(null);
+	const host = useContext(HostContext);
 
 	const sub = useCallback(
-		(cb: () => void) => subscribeFn(app, key, cb, hostRef.current),
-		[app, subscribeFn, key],
+		(cb: () => void) => subscribeFn(app, key, cb, host),
+		[app, subscribeFn, key, host],
 	);
 	const value = useSyncExternalStore(sub, () => read(app, key));
 
-	return { app, hostRef, value };
+	return { app, value };
 }
 
 export interface UseMarkdownFile extends MdSnapshot {
-	/** Ancore num elemento renderizado para permitir poda de assinantes órfãos. */
-	hostRef: React.RefObject<HTMLSpanElement | null>;
 	/** Escrita em lote no frontmatter: altere quantas propriedades quiser dentro de `fn`. */
 	update: (fn: (frontmatter: Record<string, unknown>) => void) => Promise<void>;
 	/** Substitui o corpo do arquivo (tudo após o frontmatter) atomicamente. */
@@ -64,32 +65,25 @@ export interface UseMarkdownFile extends MdSnapshot {
 
 /** Lê (reativamente) o frontmatter + corpo de um `.md` e expõe escrita em lote. */
 export function useMarkdownFile(path: string): UseMarkdownFile {
-	const { app, value, hostRef } = useStoreValue(subscribe, getSnapshot, path);
+	const { app, value } = useStoreValue(subscribeFile, getSnapshot, path);
 	return {
 		...value,
-		hostRef,
 		update: (fn) => updateFrontmatter(app, path, fn),
 		updateBody: (body) => updateBody(app, path, body),
 	};
 }
 
 export interface UseSubfolders {
-	hostRef: React.RefObject<HTMLSpanElement | null>;
 	items: Subfolder[];
 }
 
 /** Lista (reativamente) as subpastas de uma pasta. */
 export function useSubfolders(folder: string): UseSubfolders {
-	const { value, hostRef } = useStoreValue(
-		subscribeSubfolders,
-		getSubfolders,
-		folder,
-	);
-	return { hostRef, items: value };
+	const { value } = useStoreValue(subscribeSubfolders, getSubfolders, folder);
+	return { items: value };
 }
 
 export interface UseFolderFiles {
-	hostRef: React.RefObject<HTMLSpanElement | null>;
 	items: MdSnapshot[];
 }
 
@@ -102,10 +96,18 @@ export function useFolderFiles(
 	folder: string,
 	recursive = true,
 ): UseFolderFiles {
-	const { value, hostRef } = useStoreValue(
-		subscribeFolderFiles,
-		getFolderFiles,
-		folderFilesKey(folder, recursive),
+	const app = useApp();
+	const host = useContext(HostContext);
+
+	// Estabiliza as fns de subscribe/read com os parâmetros extras (folder + recursive)
+	// sem expor o encoding de chave para fora da lib.
+	const sub = useCallback(
+		(cb: () => void) => subscribeFolderFiles(app, folder, cb, host, recursive),
+		[app, folder, host, recursive],
 	);
-	return { hostRef, items: value };
+	const value = useSyncExternalStore(sub, () =>
+		getFolderFiles(app, folder, recursive),
+	);
+
+	return { items: value };
 }
