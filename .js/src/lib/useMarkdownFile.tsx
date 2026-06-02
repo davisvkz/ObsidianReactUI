@@ -8,8 +8,8 @@ import {
 	subscribe,
 	subscribeSubfolders,
 	updateFrontmatter,
-} from "@/scripts/markdownStore";
-import { AppContext } from "@/scripts/utils";
+} from "@/lib/markdownStore";
+import { AppContext } from "@/lib/utils";
 
 export function useApp(): App {
 	const app = useContext(AppContext);

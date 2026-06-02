@@ -19,12 +19,12 @@ import {
 	ensureFolder,
 	type Subfolder,
 	trashPath,
-} from "@/scripts/markdownStore";
+} from "@/lib/markdownStore";
 import {
 	useApp,
 	useMarkdownFile,
 	useSubfolders,
-} from "@/scripts/useMarkdownFile";
+} from "@/lib/useMarkdownFile";
 
 /**
  * Convenção do EXEMPLO to-do (não do core): um to-do é uma pasta com `index.md`

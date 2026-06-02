@@ -4,7 +4,7 @@ import {
 	parentOf,
 	ReactiveCache,
 	stripFrontmatter,
-} from "@/scripts/markdownStore";
+} from "@/lib/markdownStore";
 
 // ---------------------------------------------------------------------------
 // parentOf
