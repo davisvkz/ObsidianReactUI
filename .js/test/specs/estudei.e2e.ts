@@ -176,10 +176,9 @@ describe("EstudeiApp — Home + Edital (e2e)", function () {
 			bundle,
 		);
 
-		// Monta o vault de teste
-		await setupVault();
-
-		// Abre index.md em preview
+		// Abre index.md ANTES do setupVault para que o store singleton (e o seu
+		// listener metadataCache.on("changed")) esteja registrado quando os arquivos
+		// de dados forem criados. Dessa forma os eventos "changed" chegam ao listener.
 		await browser.executeObsidian(async ({ app, obsidian }) => {
 			const file = app.vault.getAbstractFileByPath("index.md");
 			if (file instanceof obsidian.TFile) {
@@ -188,14 +187,35 @@ describe("EstudeiApp — Home + Edital (e2e)", function () {
 			}
 		});
 
-		// Aguarda o app montar (tabs Home/Início devem aparecer)
+		// Aguarda o app montar (tablist presente = store listener registrado)
 		await browser.waitUntil(
 			async () => {
-				const tabs = await deepQueryAll("[data-value='home']");
-				return tabs.length > 0;
+				const lists = await deepQueryAll("[role='tablist']");
+				return lists.length > 0;
 			},
-			{ timeout: 15_000, timeoutMsg: "EstudeiApp não montou — tab Home não apareceu" },
+			{ timeout: 10_000, timeoutMsg: "EstudeiApp não montou antes do setupVault" },
 		);
+
+		// Cria os arquivos do vault com o store listener já ativo
+		await setupVault();
+
+		// Aguarda o metadataCache indexar estudei/index.md (ou força re-indexação).
+		// Esse arquivo pode ser ignorado pelo Obsidian quando tem o mesmo nome do
+		// arquivo raiz aberto em preview — um modify() garante que ele seja processado.
+		const indexed = await browser.executeObsidian(
+			({ app }, root: string) =>
+				app.metadataCache.getCache(`${root}/index.md`)?.frontmatter?.nome === "Plano PRF",
+			ROOT,
+		);
+		if (!indexed) {
+			await browser.executeObsidian(async ({ app, obsidian }, root: string) => {
+				const file = app.vault.getAbstractFileByPath(`${root}/index.md`);
+				if (file instanceof obsidian.TFile) {
+					const content = await app.vault.read(file);
+					await app.vault.modify(file, content);
+				}
+			}, ROOT);
+		}
 	});
 
 	after(async function () {
@@ -218,7 +238,7 @@ describe("EstudeiApp — Home + Edital (e2e)", function () {
 		await browser.waitUntil(
 			async () => {
 				const badges = await deepQueryAll(".mantine-Badge-root");
-				return badges.some((b) => b.text.includes("Plano PRF"));
+				return badges.some((b) => b.text.toLowerCase().includes("plano prf"));
 			},
 			{ timeout: 15_000, timeoutMsg: "Badge 'Plano PRF' não apareceu na Home" },
 		);

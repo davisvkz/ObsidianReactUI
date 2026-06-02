@@ -5,9 +5,11 @@ import { browser, expect } from "@wdio/globals";
 import { after, before, beforeEach, describe, it } from "mocha";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BUNDLE_PATH = path.resolve(__dirname, "../../dist/bundle.js");
-const VAULT_BUNDLE_PATH = ".js/dist/bundle.js";
+const BUNDLE_PATH = path.resolve(__dirname, "../../dist/todo.js");
+const VAULT_BUNDLE_PATH = ".js/dist/todo.js";
 const ROOT = "todos";
+const INDEX_MD = "`$=const lib = await eval(await app.vault.adapter.read('.js/dist/todo.js'));lib(dv)`\n";
+const INDEX_MD_ORIG = "`$=const lib = await eval(await app.vault.adapter.read('.js/dist/bundle.js'));lib(dv)`\n";
 
 /** Lê os checkboxes do TodoApp perfurando os shadow roots. */
 function readTodos() {
@@ -99,7 +101,7 @@ describe("Exclusão reflete na UI", function () {
 	before(async function () {
 		const bundle = await fs.readFile(BUNDLE_PATH, "utf-8");
 		await browser.executeObsidian(
-			async ({ app }, vaultPath, content) => {
+			async ({ app }, vaultPath, content, indexContent) => {
 				const adapter = app.vault.adapter;
 				const dir = vaultPath.split("/").slice(0, -1).join("/");
 				if (dir) {
@@ -111,9 +113,11 @@ describe("Exclusão reflete na UI", function () {
 					}
 				}
 				await adapter.write(vaultPath, content);
+				await adapter.write("index.md", indexContent);
 			},
 			VAULT_BUNDLE_PATH,
 			bundle,
+			INDEX_MD,
 		);
 		await browser.executeObsidian(async ({ app, obsidian }, filePath) => {
 			const file = app.vault.getAbstractFileByPath(filePath);
@@ -142,6 +146,9 @@ describe("Exclusão reflete na UI", function () {
 
 	after(async function () {
 		await removeRoot();
+		await browser.executeObsidian(async ({ app }, content) => {
+			await app.vault.adapter.write("index.md", content);
+		}, INDEX_MD_ORIG);
 	});
 
 	it("remove nó aninhado ao excluir manualmente (vault)", async function () {

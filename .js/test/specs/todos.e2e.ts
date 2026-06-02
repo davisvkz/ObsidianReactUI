@@ -5,9 +5,11 @@ import { browser, expect } from "@wdio/globals";
 import { after, before, describe, it } from "mocha";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BUNDLE_PATH = path.resolve(__dirname, "../../dist/bundle.js");
-const VAULT_BUNDLE_PATH = ".js/dist/bundle.js";
+const BUNDLE_PATH = path.resolve(__dirname, "../../dist/todo.js");
+const VAULT_BUNDLE_PATH = ".js/dist/todo.js";
 const ROOT = "todos";
+const INDEX_MD = "`$=const lib = await eval(await app.vault.adapter.read('.js/dist/todo.js'));lib(dv)`\n";
+const INDEX_MD_ORIG = "`$=const lib = await eval(await app.vault.adapter.read('.js/dist/bundle.js'));lib(dv)`\n";
 
 /** Lê os checkboxes renderizados pelo TodoApp: `{ label, checked }` por nó.
  *  O TodoApp renderiza dentro de um Shadow DOM, então perfuramos os shadow roots. */
@@ -92,7 +94,7 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 		// Injeta o bundle recém-buildado no mesmo caminho que o snippet `$=` lê.
 		const bundle = await fs.readFile(BUNDLE_PATH, "utf-8");
 		await browser.executeObsidian(
-			async ({ app }, vaultPath, content) => {
+			async ({ app }, vaultPath, content, indexContent) => {
 				const adapter = app.vault.adapter;
 				const dir = vaultPath.split("/").slice(0, -1).join("/");
 				if (dir) {
@@ -104,9 +106,11 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 					}
 				}
 				await adapter.write(vaultPath, content);
+				await adapter.write("index.md", indexContent);
 			},
 			VAULT_BUNDLE_PATH,
 			bundle,
+			INDEX_MD,
 		);
 
 		// Estado limpo e render do index.md em modo leitura.
@@ -143,6 +147,9 @@ describe("To-dos aninhados (pasta-por-to-do)", function () {
 
 	after(async function () {
 		await removeRoot();
+		await browser.executeObsidian(async ({ app }, content) => {
+			await app.vault.adapter.write("index.md", content);
+		}, INDEX_MD_ORIG);
 	});
 
 	it("ignora subpasta sem index.md (não vira nó-fantasma)", async function () {

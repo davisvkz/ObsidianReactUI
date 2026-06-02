@@ -23,6 +23,9 @@ export const config: WebdriverIO.Config = {
 	capabilities: versions.map<WebdriverIO.Capabilities>(
 		([appVersion, installerVersion]) => ({
 			browserName: "obsidian",
+			...(env.OBSIDIAN_HEADLESS === "1" && {
+				"goog:chromeOptions": { args: ["--headless=new"] },
+			}),
 			"wdio:obsidianOptions": {
 				appVersion,
 				installerVersion,

@@ -96,13 +96,12 @@ export class ReturnLibraryWithCSSPlugin {
 					stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_INLINE,
 				},
 				(assets) => {
+					// Coleta todo o CSS gerado (pode haver um por entry) em uma string
 					let cssSource = '';
-
-					// Pega o CSS gerado (se existir)
-					const cssAssetName = Object.keys(assets).find((a) => a.endsWith('.css'));
-					if (cssAssetName) {
-						cssSource = assets[cssAssetName].source().toString();
-						compilation.deleteAsset(cssAssetName);
+					for (const assetName of Object.keys(assets)) {
+						if (!assetName.endsWith('.css')) continue;
+						cssSource += assets[assetName].source().toString();
+						compilation.deleteAsset(assetName);
 					}
 
 					// Atualiza o JS
@@ -129,11 +128,14 @@ return typeof ${this.name} !== "undefined" && ${this.name}.default ? ${this.name
 /** Plugin customizado para embutir o CSS */
 
 export default {
-	entry: './src/index.tsx',
+	entry: {
+		bundle: './src/index.tsx',
+		todo: './src/index-todo.tsx',
+	},
 	mode: 'development',
 	output: {
 		path: path.resolve(__dirname, 'dist'),
-		filename: 'bundle.js',
+		filename: '[name].js',
 		library: { name: 'exports', type: 'var' },
 	},
 	resolve: {

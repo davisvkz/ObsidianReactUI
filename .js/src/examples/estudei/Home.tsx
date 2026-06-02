@@ -78,22 +78,25 @@ export function Home({ root }: HomeProps) {
 	const { items: discFolders, hostRef: discHostRef } = useSubfolders(root);
 	const visibleDiscs = discFolders.filter((d) => !d.name.startsWith("_"));
 
-	// Plano e metas (arquivos singleton)
-	const { frontmatter: planoFm, hostRef: planoHostRef } = useMarkdownFile(
-		`${root}/index.md`,
-	);
+	// Metas (arquivo singleton)
 	const { frontmatter: metasFm, hostRef: metasHostRef } = useMarkdownFile(
 		`${root}/_config/metas.md`,
 	);
 	const metas = parseMetas(metasFm);
+
+	// Todos os arquivos .md do vault abaixo de `root` (recursivo)
+	const { items: allFiles, hostRef: filesHostRef } = useFolderFiles(root, true);
+
+	// Plano: lido de allFiles para garantir reatividade via o mesmo folderFiles cache
+	const planoFm = useMemo(
+		() => allFiles.find((f) => f.file?.path === `${root}/index.md`)?.frontmatter ?? {},
+		[allFiles, root],
+	);
 	const dataProva =
 		typeof planoFm.dataProva === "string" ? planoFm.dataProva : null;
 	const planoNome =
 		typeof planoFm.nome === "string" ? planoFm.nome : "Meu Plano";
 	const diasParaProva = dataProva ? daysBetween(today, dataProva) : null;
-
-	// Todos os arquivos .md do vault abaixo de `root` (recursivo)
-	const { items: allFiles, hostRef: filesHostRef } = useFolderFiles(root, true);
 
 	// Parse apenas os registros de estudo
 	const allSessions = useMemo(
@@ -174,7 +177,6 @@ export function Home({ root }: HomeProps) {
 		<Stack gap="lg" p="md" style={{ maxWidth: 1100 }}>
 			{/* Hidden anchors para poda de assinantes órfãos */}
 			<span ref={discHostRef} style={{ display: "none" }} />
-			<span ref={planoHostRef} style={{ display: "none" }} />
 			<span ref={metasHostRef} style={{ display: "none" }} />
 			<span ref={filesHostRef} style={{ display: "none" }} />
 

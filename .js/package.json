@@ -7,6 +7,7 @@
 		"build": "rspack build; notify-send 'done'",
 		"pretest": "rspack build",
 		"test": "wdio run ./wdio.conf.mts",
+		"test:headless": "OBSIDIAN_HEADLESS=1 wdio run ./wdio.conf.mts",
 		"test:unit": "vitest run",
 		"test:unit:watch": "vitest"
 	},
