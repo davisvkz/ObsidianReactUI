@@ -1,0 +1,6 @@
+node_modules/
+
+# wdio-obsidian-service
+.obsidian-cache/
+wdio-logs*/
+test/.fhs-result

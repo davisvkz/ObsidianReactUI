@@ -1,0 +1,125 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";
+@import "tailwindcss/preflight.css";
+@import "@mantine/carousel/styles.css";
+@import "@mantine/charts/styles.css";
+@import "@mantine/code-highlight/styles.css";
+@import "@mantine/core/styles.css";
+@import "@mantine/dates/styles.css";
+@import "@mantine/dropzone/styles.css";
+@import "@mantine/notifications/styles.css";
+@import "@mantine/nprogress/styles.css";
+@import "@mantine/spotlight/styles.css";
+@import "mantine-datatable/styles.css";
+
+/* ── Curriculo app vars (from references/another project/src/styles.css) ── */
+
+@keyframes scroll {
+	to {
+		transform: translate(calc(-50% - 0.5rem));
+	}
+}
+.animate-scroll {
+	animation: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear
+		infinite;
+}
+
+:root {
+	--font-size: 14px;
+	--background: transparent;
+	--foreground: var(--text-normal, #1a1a2e);
+	--card: var(--background-primary, #ffffff);
+	--card-foreground: var(--text-normal, #1a1a2e);
+	--popover: var(--background-primary, #ffffff);
+	--popover-foreground: var(--text-normal, #1a1a2e);
+	--primary: #00b87f;
+	--primary-foreground: #ffffff;
+	--secondary: var(--background-secondary, #f0f9f5);
+	--secondary-foreground: var(--text-normal, #1a1a2e);
+	--muted: var(--background-secondary, #f5f5f8);
+	--muted-foreground: var(--text-muted, #717182);
+	--accent: var(--background-modifier-hover, #e9faf4);
+	--accent-foreground: var(--text-accent, #007b53);
+	--destructive: #e5384a;
+	--destructive-foreground: #ffffff;
+	--border: var(--background-modifier-border, rgba(0, 0, 0, 0.08));
+	--input: var(--background-primary, #ffffff);
+	--input-background: var(--background-secondary, #f5f5f8);
+	--switch-background: var(--background-modifier-border-hover, #cbced4);
+	--font-weight-medium: 500;
+	--font-weight-normal: 400;
+	--ring: #00b87f;
+	--chart-1: #00b87f;
+	--chart-2: #7c5cfc;
+	--chart-3: #f9c74f;
+	--chart-4: #f45b69;
+	--chart-5: #4cc9f0;
+	--radius: 0.5rem;
+	--sidebar: var(--background-secondary, #ffffff);
+	--sidebar-foreground: var(--text-normal, #1a1a2e);
+	--sidebar-primary: #00b87f;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: var(--background-modifier-hover, #f0f9f5);
+	--sidebar-accent-foreground: var(--text-accent, #007b53);
+	--sidebar-border: var(--background-modifier-border, rgba(0, 0, 0, 0.08));
+	--sidebar-ring: #00b87f;
+	--teoria-color: #7c5cfc;
+	--leitura-color: #f9c74f;
+	--exercicio-color: #f45b69;
+	--revisao-color: #4cc9f0;
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-input-background: var(--input-background);
+	--color-switch-background: var(--switch-background);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+
+	body {
+		@apply bg-background text-foreground;
+	}
+
+	html {
+		font-size: var(--font-size);
+	}
+}

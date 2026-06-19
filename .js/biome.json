@@ -1,0 +1,99 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on",
+				"useSortedAttributes": "on",
+				"useSortedInterfaceMembers": "on",
+				"useSortedKeys": "on",
+				"useSortedProperties": "on"
+			}
+		},
+		"enabled": true
+	},
+	"files": {
+		"includes": [
+			"**",
+"!!package.json"
+		]
+	},
+	"css": {
+		"parser": {
+			"cssModules": false,
+			"tailwindDirectives": true
+		},
+		"formatter": {
+			"enabled": true,
+			"indentStyle": "tab"
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 100
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"linter": {
+		"domains": {
+			"react": "all"
+		},
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "warn",
+				"noForEach": "warn",
+				"noImplicitCoercions": "warn",
+				"noUselessStringConcat": "warn"
+			},
+			"nursery": {
+				"noFloatingPromises": "warn",
+				"noLeakedRender": "warn",
+				"noMisusedPromises": "warn",
+				"noShadow": "warn"
+			},
+			"performance": {
+				"noAwaitInLoops": "warn"
+			},
+			"style": {
+				"noInferrableTypes": "warn",
+				"noNegationElse": "warn",
+				"noParameterAssign": "warn",
+				"noUselessElse": "warn",
+				"useCollapsedElseIf": "warn",
+				"useComponentExportOnlyModules": "off",
+				"useConsistentArrayType": {
+					"level": "warn",
+					"options": {
+						"syntax": "shorthand"
+					}
+				},
+				"useConsistentTypeDefinitions": {
+					"level": "warn",
+					"options": {
+						"style": "interface"
+					}
+				},
+				"useFragmentSyntax": "warn",
+				"useSelfClosingElements": "warn",
+				"useThrowNewError": "warn",
+				"useThrowOnlyError": "warn"
+			},
+			"suspicious": {
+				"noConsole": "warn",
+				"noEmptyBlockStatements": "warn",
+				"noEvolvingTypes": "warn"
+			}
+		}
+	},
+	"vcs": {
+		"clientKind": "git",
+		"enabled": true,
+		"useIgnoreFile": true
+	}
+}
